@@ -198,17 +198,9 @@ uint16_t Weather::makeMeasurment(uint8_t command)
 	 delay(100);
 
 	Wire.requestFrom(ADDRESS,nBytes);
-	//Wait for data
-	int counter = 0;
-	while (Wire.available() < nBytes){
-	  delay(1);
-	  counter ++;
-	  if (counter >100){
-	    // Timeout: Sensor did not return any data
-	    return 100;
-	  }
-	}
-
+	if(Wire.available() != nBytes)
+  	return 100;
+	
 	unsigned int msb = Wire.read();
 	unsigned int lsb = Wire.read();
 	// Clear the last to bits of LSB to 00.
