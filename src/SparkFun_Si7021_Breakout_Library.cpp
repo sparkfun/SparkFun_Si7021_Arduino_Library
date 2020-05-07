@@ -45,6 +45,7 @@
 {
   Wire.begin();
 
+#ifdef DEBUG
   uint8_t ID_Temp_Hum = checkID();
 
   int x = 0;
@@ -69,6 +70,7 @@
   else
   	Serial.println("No Devices Detected");
   	//Serial.println(ID_Temp_Hum, HEX);
+#endif
 }
 
 /****************Si7021 & HTU21D Functions**************************************/
