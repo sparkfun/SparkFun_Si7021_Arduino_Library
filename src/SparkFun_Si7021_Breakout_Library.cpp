@@ -37,6 +37,7 @@
 #include "SparkFun_Si7021_Breakout_Library/SparkFun_Si7021_Breakout_Library.h"
 #endif
 
+#include <util/delay.h>
 
  //Initialize
  Weather::Weather(){}
@@ -195,7 +196,7 @@ uint16_t Weather::makeMeasurment(uint8_t command)
 	// When not using clock stretching (*_NOHOLD commands) delay here
 	// is needed to wait for the measurement.
 	// According to datasheet the max. conversion time is ~22ms
-	 delay(100);
+        _delay_ms(100);
 
 	Wire.requestFrom(ADDRESS,nBytes);
 	if(Wire.available() != nBytes)
