@@ -28,6 +28,8 @@ void setup()
   Serial.begin(115200); 
   Serial.println("SparkFun Si7021 Example");
 
+  Wire.begin();
+
   sensor.begin();
 }
 

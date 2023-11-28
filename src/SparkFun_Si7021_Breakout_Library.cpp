@@ -44,8 +44,6 @@ Weather::Weather()
 
 bool Weather::begin()
 {
-    Wire.begin();
-
     uint8_t ID_Temp_Hum = checkID();
 
     int x = 0;
