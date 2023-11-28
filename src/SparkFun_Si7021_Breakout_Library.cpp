@@ -37,39 +37,15 @@
 #include "SparkFun_Si7021_Breakout_Library/SparkFun_Si7021_Breakout_Library.h"
 #endif
 
-// Initialize
-Weather::Weather()
-{
-}
-
 bool Weather::begin()
 {
-    uint8_t ID_Temp_Hum = checkID();
+    uint8_t deviceID = checkID();
 
-    int x = 0;
-
-    if (ID_Temp_Hum == 0x15) // Ping CheckID register
-        x = 1;
-    else if (ID_Temp_Hum == 0x32)
-        x = 2;
-    else
-        x = 0;
-
-    if (x == 1)
-    {
-        Serial.println("Si7021 Found");
-        // Serial.println(ID_Temp_Hum, HEX);
+    if (deviceID == 0x15) // Si7021 Found
         return true;
-    }
-    else if (x == 2)
-    {
-        Serial.println("HTU21D Found");
-        // Serial.println(ID_Temp_Hum, HEX);
+    else if (deviceID == 0x32) // HTU21D Found
         return true;
-    }
-    else
-        Serial.println("No Devices Detected");
-    // Serial.println(ID_Temp_Hum, HEX);
+
     return false;
 }
 
@@ -109,37 +85,36 @@ float Weather::getTempF()
     return ((getTemp() * 1.8) + 32.0); // Convert celsius to fahrenheit
 }
 
+// Turn on the heater
 void Weather::heaterOn()
 {
-    // Turns on the ADDRESS heater
-    uint8_t regVal = readReg();
+    uint8_t regVal = readRegister8(SI7021_READ_USER_REG);
     regVal |= _BV(HTRE);
-    // turn on the heater
-    writeReg(regVal);
+    writeRegister8(SI7021_WRITE_USER_REG, regVal);
 }
 
+// Turns off the heater
 void Weather::heaterOff()
 {
-    // Turns off the ADDRESS heater
-    uint8_t regVal = readReg();
+    uint8_t regVal = readRegister8(SI7021_READ_USER_REG);
     regVal &= ~_BV(HTRE);
-    writeReg(regVal);
+    writeRegister8(SI7021_WRITE_USER_REG, regVal);
 }
 
-void Weather::changeResolution(uint8_t i)
+// Changes to resolution of measurements
+void Weather::setResolution(uint8_t resolutionValue)
 {
-    // Changes to resolution of ADDRESS measurements.
-    // Set i to:
+    
+    // Set resolutionValue to:
     //      RH         Temp
     // 0: 12 bit       14 bit (default)
     // 1:  8 bit       12 bit
     // 2: 10 bit       13 bit
     // 3: 11 bit       11 bit
 
-    uint8_t regVal = readReg();
-    // zero resolution bits
-    regVal &= 0b011111110;
-    switch (i)
+    uint8_t regVal = readRegister8(SI7021_READ_USER_REG);
+    regVal &= 0b0 1111 1110; //Default 12/14 bit
+    switch (resolutionValue)
     {
     case 1:
         regVal |= 0b00000001;
@@ -150,85 +125,92 @@ void Weather::changeResolution(uint8_t i)
     case 3:
         regVal |= 0b10000001;
     default:
-        regVal |= 0b00000000;
         break;
     }
-    // write new resolution settings to the register
-    writeReg(regVal);
+    writeRegister8(SI7021_WRITE_USER_REG, regVal);
 }
 
+// Changes to resolution of measurements
+void Weather::changeResolution(uint8_t resolutionValue)
+{
+    setResolution(resolutionValue);
+}
+
+//Send software reset command
 void Weather::reset()
 {
-    // Reset user resister
-    writeReg(SOFT_RESET);
+    writeRegister8(SI7021_WRITE_USER_REG, SI7021_SOFT_RESET);
 }
 
-uint8_t Weather::checkID()
+// Get device ID
+uint8_t Weather::getDeviceID()
 {
-    uint8_t ID_1;
-
-    // Check device ID
-    Wire.beginTransmission(ADDRESS);
+    Wire.beginTransmission(SI7021_ADDRESS);
     Wire.write(0xFC);
     Wire.write(0xC9);
     Wire.endTransmission();
 
-    Wire.requestFrom(ADDRESS, 1);
+    Wire.requestFrom(SI7021_ADDRESS, 1);
 
-    ID_1 = Wire.read();
-
-    return (ID_1);
+    return (Wire.read());
 }
 
-uint16_t Weather::makeMeasurment(uint8_t command)
+//Depricated - see get device ID
+uint8_t Weather::checkID()
 {
-    // Take one ADDRESS measurement given by command.
-    // It can be either temperature or relative humidity
+    return (getDeviceID);
+}
+
+// Write single register
+void Weather::writeRegister8(uint8_t registerAddress, uint8_t value)
+{
+    Wire.beginTransmission(SI7021_ADDRESS);
+    Wire.write(SI7021_WRITE_USER_REG);
+    Wire.write(value);
+    Wire.endTransmission();
+}
+
+// Read single register
+uint8_t Weather::readRegister8(uint8_t registerAddress)
+{
+    Wire.beginTransmission(SI7021_ADDRESS);
+    Wire.write(registerAddress);
+    Wire.endTransmission();
+    Wire.requestFrom(SI7021_ADDRESS, 1);
+    uint8_t regVal = Wire.read();
+    return regVal;
+}
+
+// Read a 16 bit register
+uint16_t Weather::readRegister16(uint8_t registerAddress)
+{
     // TODO: implement checksum checking
 
-    uint16_t nBytes = 3;
-    // if we are only reading old temperature, read olny msb and lsb
-    if (command == 0xE0)
-        nBytes = 2;
-
-    Wire.beginTransmission(ADDRESS);
-    Wire.write(command);
+    Wire.beginTransmission(SI7021_ADDRESS);
+    Wire.write(registerAddress);
     Wire.endTransmission();
+
     // When not using clock stretching (*_NOHOLD commands) delay here
     // is needed to wait for the measurement.
     // According to datasheet the max. conversion time is ~22ms
     delay(100);
 
-    Wire.requestFrom(ADDRESS, nBytes);
-    if (Wire.available() != nBytes)
+    Wire.requestFrom(SI7021_ADDRESS, 2);
+    if (Wire.available() != 2)
         return 100;
 
-    unsigned int msb = Wire.read();
-    unsigned int lsb = Wire.read();
+    uint16_t msb = Wire.read();
+    uint16_t lsb = Wire.read();
+    uint16_t value = msb << 8 | lsb;
+    return value;
+}
+
+// Read a given register
+uint16_t Weather::makeMeasurment(uint8_t registerAddress)
+{
+    uin16_t response = readRegister16(registerAddress);
     // Clear the last to bits of LSB to 00.
     // According to datasheet LSB of RH is always xxxxxx10
-    lsb &= 0xFC;
-    unsigned int mesurment = msb << 8 | lsb;
-
-    return mesurment;
-}
-
-void Weather::writeReg(uint8_t value)
-{
-    // Write to user register on ADDRESS
-    Wire.beginTransmission(ADDRESS);
-    Wire.write(WRITE_USER_REG);
-    Wire.write(value);
-    Wire.endTransmission();
-}
-
-uint8_t Weather::readReg()
-{
-    // Read from user register on ADDRESS
-    Wire.beginTransmission(ADDRESS);
-    Wire.write(READ_USER_REG);
-    Wire.endTransmission();
-    Wire.requestFrom(ADDRESS, 1);
-    uint8_t regVal = Wire.read();
-    return regVal;
+    response &= 0xFFFC;
+    return (response);
 }
