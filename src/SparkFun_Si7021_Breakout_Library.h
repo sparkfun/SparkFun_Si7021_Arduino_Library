@@ -37,37 +37,37 @@
 
 /****************Si7021 & HTU21D Definitions***************************/
 
-#define ADDRESS 0x40
+#define SI7021_ADDRESS 0x40
 
-#define TEMP_MEASURE_HOLD 0xE3
-#define HUMD_MEASURE_HOLD 0xE5
-#define TEMP_MEASURE_NOHOLD 0xF3
-#define HUMD_MEASURE_NOHOLD 0xF5
-#define TEMP_PREV 0xE0
+#define SI7021_TEMP_MEASURE_HOLD 0xE3
+#define SI7021_HUMD_MEASURE_HOLD 0xE5
+#define SI7021_TEMP_MEASURE_NOHOLD 0xF3
+#define SI7021_HUMD_MEASURE_NOHOLD 0xF5
+#define SI7021_TEMP_PREV 0xE0
 
-#define WRITE_USER_REG 0xE6
-#define READ_USER_REG 0xE7
-#define SOFT_RESET 0xFE
+#define SI7021_WRITE_USER_REG 0xE6
+#define SI7021_READ_USER_REG 0xE7
+
+#define SI7021_WRITE_HEATER_CONTROL_REG 0x51
+#define SI7021_READ_HEATER_CONTROL_REG 0x11
+
+#define SI7021_SOFT_RESET 0xFE
 
 #define HTRE 0x02
 #define _BV(bit) (1 << (bit))
 
-#define CRC_POLY 0x988000 // Shifted Polynomial for CRC check
+#define SI7021_CRC_POLY 0x988000 // Shifted Polynomial for CRC check
 
 // Error codes
-#define I2C_TIMEOUT 998
-#define BAD_CRC 999
+#define SI7021_I2C_TIMEOUT 998
+#define SI7021_BAD_CRC 999
 
 /****************Si7021 & HTU21D Class**************************************/
 class Weather
 {
   public:
-    // Constructor
-    Weather();
-
     bool begin();
 
-    // Si7021 & HTU21D Public Functions
     float getRH();
     float readTemp();
     float getTemp();
@@ -76,14 +76,18 @@ class Weather
     void heaterOn();
     void heaterOff();
     void changeResolution(uint8_t i);
-    void reset();
-    uint8_t checkID();
+    
+	void reset();
+    
+	uint8_t getDeviceID();
+    uint8_t checkID(); //Depricated
 
   private:
-    // Si7021 & HTU21D Private Functions
+
     uint16_t makeMeasurment(uint8_t command);
-    void writeReg(uint8_t value);
-    uint8_t readReg();
+    void writeRegister8(uint8_t registerAddress, uint8_t value);
+    uint8_t readRegister8(uint8_t registerAddress);
+    uint16_t readRegister16(uint8_t registerAddress);
 };
 
 #endif
