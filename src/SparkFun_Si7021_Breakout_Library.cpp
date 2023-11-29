@@ -37,8 +37,9 @@
 #include "SparkFun_Si7021_Breakout_Library/SparkFun_Si7021_Breakout_Library.h"
 #endif
 
-bool SI7021::begin()
+bool SI7021::begin(TwoWire &wirePort)
 {
+    _i2cPort = &wirePort;
     return (isConnected());
 }
 
@@ -267,14 +268,14 @@ uint8_t SI7021::getDeviceID()
     return ((deviceSerialNumber >> 24) & 0xFF); // Extract SNB_3
 
     // // Device ID is the first byte of the 2nd serial number response (ie SNB_3)
-    // Wire.beginTransmission(SI7021_ADDRESS);
-    // Wire.write(SI7021_READ_SERIAL_NUMBER_2_A);
-    // Wire.write(SI7021_READ_SERIAL_NUMBER_2_B);
-    // Wire.endTransmission();
+    // _i2cPort->beginTransmission(SI7021_ADDRESS);
+    // _i2cPort->write(SI7021_READ_SERIAL_NUMBER_2_A);
+    // _i2cPort->write(SI7021_READ_SERIAL_NUMBER_2_B);
+    // _i2cPort->endTransmission();
 
-    // Wire.requestFrom(SI7021_ADDRESS, 1);
+    // _i2cPort->requestFrom(SI7021_ADDRESS, 1);
 
-    // return (Wire.read());
+    // return (_i2cPort->read());
 }
 
 // Get device's 64-bit serial number
@@ -282,14 +283,14 @@ uint64_t SI7021::getSerialNumber()
 {
     uint8_t crc = 0;
 
-    Wire.beginTransmission(SI7021_ADDRESS);
-    Wire.write(SI7021_READ_SERIAL_NUMBER_1_A);
-    Wire.write(SI7021_READ_SERIAL_NUMBER_1_B);
-    Wire.endTransmission();
+    _i2cPort->beginTransmission(SI7021_ADDRESS);
+    _i2cPort->write(SI7021_READ_SERIAL_NUMBER_1_A);
+    _i2cPort->write(SI7021_READ_SERIAL_NUMBER_1_B);
+    _i2cPort->endTransmission();
 
-    Wire.requestFrom(SI7021_ADDRESS, 8);
+    _i2cPort->requestFrom(SI7021_ADDRESS, 8);
 
-    if (Wire.available() == 0)
+    if (_i2cPort->available() == 0)
     {
         deviceSerialNumber = 0;
         return (deviceSerialNumber);
@@ -301,21 +302,21 @@ uint64_t SI7021::getSerialNumber()
         if (x % 2 == 0)
         {
             deviceSerialNumber <<= 8;
-            deviceSerialNumber |= Wire.read();
+            deviceSerialNumber |= _i2cPort->read();
         }
         else
-            crc = Wire.read();
+            crc = _i2cPort->read();
     }
 
-    Wire.beginTransmission(SI7021_ADDRESS);
-    Wire.write(SI7021_READ_SERIAL_NUMBER_2_A);
-    Wire.write(SI7021_READ_SERIAL_NUMBER_2_B);
-    Wire.endTransmission();
+    _i2cPort->beginTransmission(SI7021_ADDRESS);
+    _i2cPort->write(SI7021_READ_SERIAL_NUMBER_2_A);
+    _i2cPort->write(SI7021_READ_SERIAL_NUMBER_2_B);
+    _i2cPort->endTransmission();
 
     // The B portion is only 6 bytes
-    Wire.requestFrom(SI7021_ADDRESS, 6);
+    _i2cPort->requestFrom(SI7021_ADDRESS, 6);
 
-    if (Wire.available() == 0)
+    if (_i2cPort->available() == 0)
     {
         deviceSerialNumber = 0;
         return (deviceSerialNumber);
@@ -325,15 +326,15 @@ uint64_t SI7021::getSerialNumber()
     for (int x = 0; x < 6; x++)
     {
         if (x == 2 || x == 5)
-            crc = Wire.read();
+            crc = _i2cPort->read();
         else
         {
             deviceSerialNumber <<= 8;
-            deviceSerialNumber |= Wire.read();
+            deviceSerialNumber |= _i2cPort->read();
         }
     }
 
-	if(checkCrc8((uint8_t *)deviceSerialNumber, 8) != crc)
+    if (checkCrc8((uint8_t *)deviceSerialNumber, 8) != crc)
         return (SI7021_BAD_CRC);
 
     return (deviceSerialNumber);
@@ -348,29 +349,29 @@ uint8_t SI7021::checkID()
 // Write single register
 void SI7021::writeRegister8(uint8_t registerAddress, uint8_t value)
 {
-    Wire.beginTransmission(SI7021_ADDRESS);
-    Wire.write(SI7021_WRITE_USER_REG);
-    Wire.write(value);
-    Wire.endTransmission();
+    _i2cPort->beginTransmission(SI7021_ADDRESS);
+    _i2cPort->write(SI7021_WRITE_USER_REG);
+    _i2cPort->write(value);
+    _i2cPort->endTransmission();
 }
 
 // Read single register
 uint8_t SI7021::readRegister8(uint8_t registerAddress)
 {
-    Wire.beginTransmission(SI7021_ADDRESS);
-    Wire.write(registerAddress);
-    Wire.endTransmission();
-    Wire.requestFrom(SI7021_ADDRESS, 1);
-    uint8_t regVal = Wire.read();
+    _i2cPort->beginTransmission(SI7021_ADDRESS);
+    _i2cPort->write(registerAddress);
+    _i2cPort->endTransmission();
+    _i2cPort->requestFrom(SI7021_ADDRESS, 1);
+    uint8_t regVal = _i2cPort->read();
     return regVal;
 }
 
 // Read a given register, polling until device responds
 uint16_t SI7021::getMeasurementNoHold(uint8_t registerAddress)
 {
-    Wire.beginTransmission(SI7021_ADDRESS);
-    Wire.write(registerAddress);
-    Wire.endTransmission();
+    _i2cPort->beginTransmission(SI7021_ADDRESS);
+    _i2cPort->write(registerAddress);
+    _i2cPort->endTransmission();
 
     // During a "no hold" register read, we can poll the device until it is complete
     uint8_t maxWait = 100; // In ms
@@ -383,16 +384,16 @@ uint16_t SI7021::getMeasurementNoHold(uint8_t registerAddress)
             return (0);
     }
 
-    Wire.requestFrom(SI7021_ADDRESS, 3);
-    if (Wire.available() != 3)
-        return(SI7021_I2C_ERROR);
+    _i2cPort->requestFrom(SI7021_ADDRESS, 3);
+    if (_i2cPort->available() != 3)
+        return (SI7021_I2C_ERROR);
 
-    uint8_t msb = Wire.read();
-    uint8_t lsb = Wire.read();
-    uint8_t crc = Wire.read();
+    uint8_t msb = _i2cPort->read();
+    uint8_t lsb = _i2cPort->read();
+    uint8_t crc = _i2cPort->read();
 
     int value = (uint16_t)msb << 8 | lsb;
-    if(checkCrc8((uint8_t *)value, 2) != crc)
+    if (checkCrc8((uint8_t *)value, 2) != crc)
         return (SI7021_BAD_CRC);
 
     // LSB of RH is always xxxxxx10 - clear LSB to 00.

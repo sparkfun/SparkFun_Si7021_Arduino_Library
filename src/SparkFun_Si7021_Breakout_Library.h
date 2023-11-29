@@ -34,6 +34,7 @@
 #define SparkFun_Si7021_Breakout_Library_h
 
 #include <Arduino.h>
+#include "Wire.h"
 
 #define SI7021_ADDRESS 0x40
 
@@ -64,7 +65,7 @@
 class SI7021
 {
   public:
-    bool begin();
+    bool begin(TwoWire &wirePort = Wire);
     bool isConnected();
 
     float getRH();
@@ -74,11 +75,11 @@ class SI7021
     float getPreviousTemperature();
     float getPreviousTemperatureF();
 
-    float readTemp(); //Get previous temp reading - Depricated
-    float readTempF(); //Get privous temp reading - Depricated
+    float readTemp();  // Get previous temp reading - Depricated
+    float readTempF(); // Get privous temp reading - Depricated
 
-    float getTemp(); //Get temp reading - Depricated
-    float getTempF(); //Get temp reading - Depricated
+    float getTemp();  // Get temp reading - Depricated
+    float getTempF(); // Get temp reading - Depricated
 
     void heaterOn();
     void heaterOff();
@@ -90,7 +91,7 @@ class SI7021
 
     void setResolution(uint8_t resolutionValue);
     uint8_t getResolution();
-    void changeResolution(uint8_t resolutionValue); //Depricated
+    void changeResolution(uint8_t resolutionValue); // Depricated
 
     void reset();
 
@@ -99,6 +100,8 @@ class SI7021
     uint8_t checkID(); // Depricated
 
   private:
+    TwoWire *_i2cPort;
+
     uint64_t deviceSerialNumber = 0;
 
     uint16_t getMeasurementNoHold(uint8_t registerAddress);
