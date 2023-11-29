@@ -35,59 +35,79 @@
 
 #include <Arduino.h>
 
-/****************Si7021 & HTU21D Definitions***************************/
-
 #define SI7021_ADDRESS 0x40
 
 #define SI7021_TEMP_MEASURE_HOLD 0xE3
 #define SI7021_HUMD_MEASURE_HOLD 0xE5
 #define SI7021_TEMP_MEASURE_NOHOLD 0xF3
 #define SI7021_HUMD_MEASURE_NOHOLD 0xF5
-#define SI7021_TEMP_PREV 0xE0
+#define SI7021_TEMP_PREVIOUS 0xE0
 
-#define SI7021_WRITE_USER_REG 0xE6
 #define SI7021_READ_USER_REG 0xE7
+#define SI7021_WRITE_USER_REG 0xE6
+#define SI7021_HTRE_BIT 2
 
-#define SI7021_WRITE_HEATER_CONTROL_REG 0x51
 #define SI7021_READ_HEATER_CONTROL_REG 0x11
+#define SI7021_WRITE_HEATER_CONTROL_REG 0x51
+
+#define SI7021_READ_SERIAL_NUMBER_1_A 0xFA
+#define SI7021_READ_SERIAL_NUMBER_1_B 0x0F
+#define SI7021_READ_SERIAL_NUMBER_2_A 0xFC
+#define SI7021_READ_SERIAL_NUMBER_2_B 0xC9
 
 #define SI7021_SOFT_RESET 0xFE
 
-#define HTRE 0x02
-#define _BV(bit) (1 << (bit))
-
-#define SI7021_CRC_POLY 0x988000 // Shifted Polynomial for CRC check
-
 // Error codes
-#define SI7021_I2C_TIMEOUT 998
 #define SI7021_BAD_CRC 999
+#define SI7021_I2C_ERROR 998
 
-/****************Si7021 & HTU21D Class**************************************/
-class Weather
+class SI7021
 {
   public:
     bool begin();
+    bool isConnected();
 
     float getRH();
-    float readTemp();
-    float getTemp();
-    float readTempF();
-    float getTempF();
+    float getTemperature();
+    float getTemperatureF();
+
+    float getPreviousTemperature();
+    float getPreviousTemperatureF();
+
+    float readTemp(); //Get previous temp reading - Depricated
+    float readTempF(); //Get privous temp reading - Depricated
+
+    float getTemp(); //Get temp reading - Depricated
+    float getTempF(); //Get temp reading - Depricated
+
     void heaterOn();
     void heaterOff();
-    void changeResolution(uint8_t i);
-    
-	void reset();
-    
-	uint8_t getDeviceID();
-    uint8_t checkID(); //Depricated
+    void setHeater(bool heaterOn);
+    bool getHeater();
+
+    void setHeaterCurrent(uint8_t currentLevel);
+    uint8_t getHeaterCurrent();
+
+    void setResolution(uint8_t resolutionValue);
+    uint8_t getResolution();
+    void changeResolution(uint8_t resolutionValue); //Depricated
+
+    void reset();
+
+    uint64_t getSerialNumber();
+    uint8_t getDeviceID();
+    uint8_t checkID(); // Depricated
 
   private:
+    uint64_t deviceSerialNumber = 0;
 
-    uint16_t makeMeasurment(uint8_t command);
+    uint16_t getMeasurementNoHold(uint8_t registerAddress);
+
     void writeRegister8(uint8_t registerAddress, uint8_t value);
     uint8_t readRegister8(uint8_t registerAddress);
     uint16_t readRegister16(uint8_t registerAddress);
+
+    uint8_t checkCrc8(uint8_t *inputBytes, uint8_t inputLength);
 };
 
 #endif
