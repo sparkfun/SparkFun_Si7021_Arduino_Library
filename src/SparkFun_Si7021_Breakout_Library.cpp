@@ -273,7 +273,7 @@ uint8_t SI7021::getDeviceID()
     // _i2cPort->write(SI7021_READ_SERIAL_NUMBER_2_B);
     // _i2cPort->endTransmission();
 
-    // _i2cPort->requestFrom(SI7021_ADDRESS, 1);
+    // _i2cPort->requestFrom(SI7021_ADDRESS, (uint8_t)1);
 
     // return (_i2cPort->read());
 }
@@ -314,7 +314,7 @@ uint64_t SI7021::getSerialNumber()
     _i2cPort->endTransmission();
 
     // The B portion is only 6 bytes
-    _i2cPort->requestFrom(SI7021_ADDRESS, 6);
+    _i2cPort->requestFrom(SI7021_ADDRESS, (uint8_t)6);
 
     if (_i2cPort->available() == 0)
     {
@@ -361,7 +361,7 @@ uint8_t SI7021::readRegister8(uint8_t registerAddress)
     _i2cPort->beginTransmission(SI7021_ADDRESS);
     _i2cPort->write(registerAddress);
     _i2cPort->endTransmission();
-    _i2cPort->requestFrom(SI7021_ADDRESS, 1);
+    _i2cPort->requestFrom(SI7021_ADDRESS, (uint8_t)1);
     uint8_t regVal = _i2cPort->read();
     return regVal;
 }
@@ -384,7 +384,7 @@ uint16_t SI7021::getMeasurementNoHold(uint8_t registerAddress)
             return (0);
     }
 
-    _i2cPort->requestFrom(SI7021_ADDRESS, 3);
+    _i2cPort->requestFrom(SI7021_ADDRESS, (uint8_t)3);
     if (_i2cPort->available() != 3)
         return (SI7021_I2C_ERROR);
 
