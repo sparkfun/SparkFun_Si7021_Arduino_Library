@@ -288,7 +288,7 @@ uint64_t SI7021::getSerialNumber()
     _i2cPort->write(SI7021_READ_SERIAL_NUMBER_1_B);
     _i2cPort->endTransmission();
 
-    _i2cPort->requestFrom(SI7021_ADDRESS, 8);
+    _i2cPort->requestFrom(SI7021_ADDRESS, (uint8_t)8);
 
     if (_i2cPort->available() == 0)
     {
