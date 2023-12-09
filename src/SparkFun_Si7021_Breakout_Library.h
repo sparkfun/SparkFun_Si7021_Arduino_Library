@@ -33,10 +33,10 @@
 #ifndef SparkFun_Si7021_Breakout_Library_h
 #define SparkFun_Si7021_Breakout_Library_h
 
-#include <Arduino.h>
 #include "Wire.h"
+#include <Arduino.h>
 
-#define SI7021_ADDRESS 0x40
+const uint8_t SI7021_ADDRESS = 0x40;
 
 #define SI7021_TEMP_MEASURE_HOLD 0xE3
 #define SI7021_HUMD_MEASURE_HOLD 0xE5
@@ -58,9 +58,13 @@
 
 #define SI7021_SOFT_RESET 0xFE
 
-// Error codes
-#define SI7021_BAD_CRC 999
-#define SI7021_I2C_ERROR 998
+// Measurement results
+typedef enum Level {
+  SI7021_OK = 0x00,
+  SI7021_BAD_CRC,
+  SI7021_I2C_ERROR,
+  SI7021_READ_TIMEOUT,
+} si7021Result;
 
 class SI7021
 {
@@ -69,8 +73,12 @@ class SI7021
     bool isConnected();
 
     float getRH();
+    bool getRH(float *humidity);
+
     float getTemperature();
+    bool getTemperature(float *temperature);
     float getTemperatureF();
+    bool getTemperatureF(float *temperatureF);
 
     float getPreviousTemperature();
     float getPreviousTemperatureF();
@@ -104,7 +112,7 @@ class SI7021
 
     uint64_t deviceSerialNumber = 0;
 
-    uint16_t getMeasurementNoHold(uint8_t registerAddress);
+    si7021Result getMeasurementNoHold(uint8_t registerAddress, uint16_t *reading);
 
     void writeRegister8(uint8_t registerAddress, uint8_t value);
     uint8_t readRegister8(uint8_t registerAddress);

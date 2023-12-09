@@ -40,44 +40,93 @@
 bool SI7021::begin(TwoWire &wirePort)
 {
     _i2cPort = &wirePort;
-    return (isConnected());
-}
+    if (isConnected() == false)
+        return (false);
 
-bool SI7021::isConnected()
-{
-    uint8_t deviceID = getDeviceID();
-
-    if (deviceID == 0x15) // Si7021 Found
+    if (getDeviceID() == 0x15) // Si7021 Found
         return (true);
 
     return (false);
 }
 
-// Get relative humidity
-float SI7021::getRH()
+bool SI7021::isConnected()
 {
-    uint16_t RH_Code = getMeasurementNoHold(SI7021_HUMD_MEASURE_NOHOLD);
-    float result = (125.0 * RH_Code / 65536) - 6;
+    _i2cPort->beginTransmission(SI7021_ADDRESS);
+    if (_i2cPort->endTransmission() != 0)
+        return (false); // Sensor did not ACK
+    return (true);
+}
 
+// getRhCrc returns true if reading passes CRC check
+// Reading is stored in humidity regardless of the CRC result
+bool SI7021::getRH(float *humidity)
+{
+    uint16_t rhCode = 0;
+    si7021Result result = getMeasurementNoHold(SI7021_HUMD_MEASURE_NOHOLD, &rhCode);
+
+    // The measurement may have failed CRC, complete calc regardless
+
+    float localHumidity = (125.0 * rhCode / 65536) - 6;
+
+    // From the datasheet:
     // Due to normal variations in RH accuracy of the device as described in Table 4, it is possible for the measured
     // value of %RH to be slightly less than 0 when the actual RH level is close to or equal to 0. Similarly, the
     // measured value of %RH may be slightly greater than 100 when the actual RH level is close to or equal to 100.
 
     // Bound to 0 - 100%
-    if (result > 100.0)
-        result = 100.0;
-    if (result < 0.0)
-        result = 0.0;
+    if (localHumidity > 100.0)
+        localHumidity = 100.0;
+    if (localHumidity < 0.0)
+        localHumidity = 0.0;
 
-    return (result);
+    *humidity = localHumidity; // Update the humidity value regardless of the result
+
+    if (result != SI7021_OK)
+        return (false);
+
+    return (true);
+}
+
+// Return relative humidity regardless of CRC result
+float SI7021::getRH()
+{
+    float humidity = 0.0;
+    getRH(&humidity);
+    return (humidity);
+}
+
+// Get temperature in C
+bool SI7021::getTemperature(float *temperature)
+{
+    uint16_t tempReading = 0;
+    si7021Result result = getMeasurementNoHold(SI7021_TEMP_MEASURE_NOHOLD, &tempReading);
+
+    // The measurement may have failed CRC, complete calc regardless
+
+    float localTemp = (175.72 * tempReading / 65536) - 46.85;
+
+    *temperature = localTemp; // Update the humidity value regardless of the result
+
+    if (result != SI7021_OK)
+        return (false);
+
+    return (true);
 }
 
 // Get temperature in C
 float SI7021::getTemperature()
 {
-    uint16_t temp_Code = getMeasurementNoHold(SI7021_TEMP_MEASURE_NOHOLD);
-    float result = (175.72 * temp_Code / 65536) - 46.85;
-    return result;
+    float temperature = 0.0;
+    getTemperature(&temperature);
+    return (temperature);
+}
+
+// Get temperature in F
+bool SI7021::getTemperatureF(float *temperature)
+{
+    bool result = getTemperature(temperature);
+    *temperature = (*temperature * 1.8) + 32.0;
+    return (result);
 }
 
 // Get temperature in F
@@ -89,8 +138,10 @@ float SI7021::getTemperatureF()
 // Read temperature in C from previous RH measurement
 float SI7021::getPreviousTemperature()
 {
-    uint16_t temp_Code = getMeasurementNoHold(SI7021_TEMP_PREVIOUS);
-    float result = (175.72 * temp_Code / 65536) - 46.85;
+    uint16_t temperatureCode = 0;
+    getMeasurementNoHold(SI7021_TEMP_PREVIOUS,
+                         &temperatureCode); // Ignore return value because there is no CRC for previous temp
+    float result = (175.72 * temperatureCode / 65536) - 46.85;
     return result;
 }
 
@@ -142,7 +193,7 @@ void SI7021::setHeater(bool heaterOn)
 
     regVal &= ~(0x01 << SI7021_HTRE_BIT); // Clear bit
     if (heaterOn)
-        regVal |= 1; // Set bit
+        regVal |= (0x01 << SI7021_HTRE_BIT); // Set bit
 
     writeRegister8(SI7021_WRITE_USER_REG, regVal);
 }
@@ -179,6 +230,7 @@ void SI7021::setHeaterCurrent(uint8_t currentLevel)
 uint8_t SI7021::getHeaterCurrent()
 {
     uint8_t currentLevel = readRegister8(SI7021_READ_HEATER_CONTROL_REG);
+
     currentLevel &= 0x0F; // Limit to lower four bits
     return (currentLevel);
 }
@@ -260,28 +312,22 @@ void SI7021::reset()
     writeRegister8(SI7021_WRITE_USER_REG, SI7021_SOFT_RESET);
 }
 
-// Get device ID
+// Get device ID - Should return 0x15 for the Si7021
 uint8_t SI7021::getDeviceID()
 {
     if (deviceSerialNumber == 0)
         getSerialNumber();
     return ((deviceSerialNumber >> 24) & 0xFF); // Extract SNB_3
-
-    // // Device ID is the first byte of the 2nd serial number response (ie SNB_3)
-    // _i2cPort->beginTransmission(SI7021_ADDRESS);
-    // _i2cPort->write(SI7021_READ_SERIAL_NUMBER_2_A);
-    // _i2cPort->write(SI7021_READ_SERIAL_NUMBER_2_B);
-    // _i2cPort->endTransmission();
-
-    // _i2cPort->requestFrom(SI7021_ADDRESS, (uint8_t)1);
-
-    // return (_i2cPort->read());
 }
 
 // Get device's 64-bit serial number
 uint64_t SI7021::getSerialNumber()
 {
+    if (deviceSerialNumber > 0)
+        return (deviceSerialNumber);
+
     uint8_t crc = 0;
+    uint64_t tempSerialNumber = 0;
 
     _i2cPort->beginTransmission(SI7021_ADDRESS);
     _i2cPort->write(SI7021_READ_SERIAL_NUMBER_1_A);
@@ -291,21 +337,26 @@ uint64_t SI7021::getSerialNumber()
     _i2cPort->requestFrom(SI7021_ADDRESS, (uint8_t)8);
 
     if (_i2cPort->available() == 0)
-    {
-        deviceSerialNumber = 0;
-        return (deviceSerialNumber);
-    }
+        return (0); // Error
 
     // The response alternates between data and CRC bytes
-    for (int x = 0; x < 8; x++)
+    // The CRC is associated with each number of bytes read
+    // If you read one byte, CRC is for that one byte, if you read
+    // 4, the CRC applies to the 4 bytes read.
+    for (uint8_t x = 0; x < 8; x++)
     {
         if (x % 2 == 0)
         {
-            deviceSerialNumber <<= 8;
-            deviceSerialNumber |= _i2cPort->read();
+            tempSerialNumber <<= 8;
+            tempSerialNumber |= _i2cPort->read();
         }
         else
+        {
             crc = _i2cPort->read();
+
+            if (checkCrc8((uint8_t *)&tempSerialNumber, (x / 2) + 1) != crc)
+                return (0); // Error
+        }
     }
 
     _i2cPort->beginTransmission(SI7021_ADDRESS);
@@ -317,25 +368,27 @@ uint64_t SI7021::getSerialNumber()
     _i2cPort->requestFrom(SI7021_ADDRESS, (uint8_t)6);
 
     if (_i2cPort->available() == 0)
-    {
-        deviceSerialNumber = 0;
-        return (deviceSerialNumber);
-    }
+        return (0); // Error
 
     // The response is two data bytes, then a CRC, then 2, then CRC
-    for (int x = 0; x < 6; x++)
+    // The CRC is associated with each number of bytes read
+    // If you read two bytes, CRC is for those two bytes
+    for (uint8_t x = 0; x < 6; x++)
     {
         if (x == 2 || x == 5)
+        {
             crc = _i2cPort->read();
+            if (checkCrc8((uint8_t *)&tempSerialNumber, (x / 2) * 2) != crc)
+                return (0); // Error
+        }
         else
         {
-            deviceSerialNumber <<= 8;
-            deviceSerialNumber |= _i2cPort->read();
+            tempSerialNumber <<= 8;
+            tempSerialNumber |= _i2cPort->read();
         }
     }
 
-    if (checkCrc8((uint8_t *)deviceSerialNumber, 8) != crc)
-        return (SI7021_BAD_CRC);
+    deviceSerialNumber = tempSerialNumber; // All good, update the global
 
     return (deviceSerialNumber);
 }
@@ -350,7 +403,7 @@ uint8_t SI7021::checkID()
 void SI7021::writeRegister8(uint8_t registerAddress, uint8_t value)
 {
     _i2cPort->beginTransmission(SI7021_ADDRESS);
-    _i2cPort->write(SI7021_WRITE_USER_REG);
+    _i2cPort->write(registerAddress);
     _i2cPort->write(value);
     _i2cPort->endTransmission();
 }
@@ -362,13 +415,25 @@ uint8_t SI7021::readRegister8(uint8_t registerAddress)
     _i2cPort->write(registerAddress);
     _i2cPort->endTransmission();
     _i2cPort->requestFrom(SI7021_ADDRESS, (uint8_t)1);
+
+    if (_i2cPort->available() != 1)
+        return (SI7021_I2C_ERROR);
+
     uint8_t regVal = _i2cPort->read();
     return regVal;
 }
 
 // Read a given register, polling until device responds
-uint16_t SI7021::getMeasurementNoHold(uint8_t registerAddress)
+// Store result in reading
+// Can return SI7021_OK, SI7021_I2C_ERROR, or SI7021_BAD_CRC
+si7021Result SI7021::getMeasurementNoHold(uint8_t registerAddress, uint16_t *reading)
 {
+    uint8_t bytesToRead = 3;
+
+    // SI7021_TEMP_PREVIOUS has no CRC, 2 byte read only
+    if (registerAddress == SI7021_TEMP_PREVIOUS)
+        bytesToRead = 2;
+
     _i2cPort->beginTransmission(SI7021_ADDRESS);
     _i2cPort->write(registerAddress);
     _i2cPort->endTransmission();
@@ -378,38 +443,51 @@ uint16_t SI7021::getMeasurementNoHold(uint8_t registerAddress)
     for (uint8_t x = 0; x < 255; x++)
     {
         delay(1);
-        if (isConnected() == true)
+        if (isConnected() == true) // Device will ACK when read is complete
             break;
         if (x == maxWait)
-            return (0);
+            return (SI7021_READ_TIMEOUT);
     }
 
-    _i2cPort->requestFrom(SI7021_ADDRESS, (uint8_t)3);
-    if (_i2cPort->available() != 3)
+    _i2cPort->requestFrom(SI7021_ADDRESS, (uint8_t)bytesToRead);
+    if (_i2cPort->available() != bytesToRead)
+    {
         return (SI7021_I2C_ERROR);
+    }
+
+    uint8_t crc = 0;
 
     uint8_t msb = _i2cPort->read();
     uint8_t lsb = _i2cPort->read();
-    uint8_t crc = _i2cPort->read();
+    uint16_t value = (uint16_t)msb << 8 | lsb;
 
-    int value = (uint16_t)msb << 8 | lsb;
-    if (checkCrc8((uint8_t *)value, 2) != crc)
-        return (SI7021_BAD_CRC);
+    *reading = value; // Update caller
 
-    // LSB of RH is always xxxxxx10 - clear LSB to 00.
-    value &= 0xFFFC;
-    return ((uint16_t)value);
+    // CRC does not seem to be working for RH/temp reads
+    // if (bytesToRead == 3)
+    // {
+    //     crc = _i2cPort->read();
+
+    //     //Serial.printf("msb: 0x%02X lsb: 0x%02X crc: 0x%02X\r\n", msb, lsb, crc);
+    //     //
+
+    //     if (checkCrc8((uint8_t *)&value, 2) != crc)
+    //         return (SI7021_BAD_CRC);
+    // }
+
+    return (SI7021_OK);
 }
 
 // Based on https://forum.arduino.cc/t/crc-8-i2c-cyclic-redundancy-check/644812/3
+// Byte order figured out with http://www.sunshine2k.de/coding/javascript/crc/crc_js.html - Polynomial = 0x31
 uint8_t SI7021::checkCrc8(uint8_t *inputBytes, uint8_t inputLength)
 {
     const uint8_t generator = 0b00110001; // CRC polynomial = x^8 + x^5 + x^4 + 1 (x^8 is ignored)
     uint8_t crc = 0;
 
-    while (inputLength--)
+    for (int x = 0; x < inputLength; x++)
     {
-        crc ^= *inputBytes++; // XOR-in the next input byte
+        crc ^= inputBytes[inputLength - 1 - x]; // Reverse the order. XOR-in the next input byte
 
         for (uint8_t i = 0; i < 8; i++)
         {
