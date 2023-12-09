@@ -2,28 +2,46 @@
 # Datatypes (KEYWORD1)
 #######################################
 
-Weather	KEYWORD1
+SI7021	KEYWORD1
 
 #######################################
 # Methods and Functions (KEYWORD2)
 #######################################
 
+begin	KEYWORD2
 getRH	KEYWORD2
-readTemp	KEYWORD2
+getTemperature	KEYWORD2
+getTemperatureF	KEYWORD2
+getPreviousTemperature	KEYWORD2
+getPreviousTemperatureF	KEYWORD2
+
 getTemp	KEYWORD2
-readTempF	KEYWORD2
 getTempF	KEYWORD2
+readTemp	KEYWORD2
+readTempF	KEYWORD2
+
 heaterOn	KEYWORD2
 heaterOff	KEYWORD2
+setHeater	KEYWORD2
+getHeater	KEYWORD2
+
+setHeaterCurrent	KEYWORD2
+getHeaterCurrent	KEYWORD2
+
+setResolution	KEYWORD2
+getResolution	KEYWORD2
 changeResolution	KEYWORD2
-Reset	KEYWORD2
+
+getSerialNumber	KEYWORD2
+getDeviceID	KEYWORD2
+
 checkID	KEYWORD2
+
+reset	KEYWORD2
+
 #######################################
 # Constants (LITERAL1)
 #######################################
-
-
-ADDRESS	LITERAL1
 
 TEMP_MEASURE_HOLD	LITERAL1
 HUMD_MEASURE_HOLD	LITERAL1
